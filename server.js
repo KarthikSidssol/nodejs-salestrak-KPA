@@ -166,3 +166,38 @@ app.post('/login', async (req, res) => {
   }
 });
 
+app.post('/forgotPassword', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    // Find user by email
+    const [users] = await req.db.query(
+      'select * from cus_mas where email = ? and status = 1',
+      [email]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'Email not registered' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Update password in the DB
+    await req.db.query(
+      'update cus_mas set password = ? where email = ?',
+      [hashedPassword, email]
+    );
+
+    res.json({ message: 'Password updated successfully' });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
