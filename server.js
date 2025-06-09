@@ -168,7 +168,7 @@ app.post('/login', async (req, res) => {
 
 app.post('/forgotPassword', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password , newPassword} = req.body;
 
     // Validate input
     if (!email || !password) {
