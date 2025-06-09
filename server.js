@@ -201,3 +201,32 @@ app.post('/forgotPassword', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+app.get('/me', authenticationToken, (req, res) => {
+  console.log("authenticationToken",req.userDetails);
+  res.json({
+    message: 'User data',
+    user: req.userDetails
+  });
+});
+
+function authenticationToken(req, res, next) {
+  const token = req.cookies['session-token']; // ✅ use correct name
+  if (token == null) return res.sendStatus(401);
+
+  jwt.verify(token, process.env.ACCESS_TOKEN, (err, userDetails) => {
+    if (err) return res.sendStatus(403);
+    req.userDetails = userDetails;
+    next();
+  });
+}
+
+app.post('/logOut', (req, res) => {
+  res.clearCookie('session-token', {
+    httpOnly: true,
+    secure: true, // true if using HTTPS
+    sameSite: 'None', // 'None' if secure=true and cross-origin
+    // sameSite: 'Lax',
+  });
+  res.status(200).json({ message: 'Logout successful' });
+});
