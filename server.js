@@ -288,8 +288,8 @@ function authenticationToken(req, res, next) {
 app.post('/logOut', (req, res) => {
   res.clearCookie('session-token', {
     httpOnly: true,
-    secure: true, // true if using HTTPS
-    sameSite: 'None', // 'None' if secure=true and cross-origin
+    secure: false, // true if using HTTPS
+    sameSite: 'Lax', // 'None' if secure=true and cross-origin
     // sameSite: 'Lax',
   });
   res.status(200).json({ message: 'Logout successful' });
