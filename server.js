@@ -920,7 +920,7 @@ app.get('/searchDocuments', authenticationToken, async (req, res) => {
     const accId = req.userDetails.userId;
 
     const [results] = await req.db.query(
-      `SELECT id, doc_name, doc_file 
+      `select id, doc_name, doc_file 
        FROM doc_mas 
        WHERE acc_id = ? AND doc_name LIKE ?`,
       [accId, `%${term}%`]
