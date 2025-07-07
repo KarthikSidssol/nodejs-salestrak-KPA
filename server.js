@@ -815,7 +815,7 @@ app.get('/getAllItemData', authenticationToken, async (req, res) => {
     const accId = req.userDetails.userId;
 
     const [headers] = await req.db.query(
-      'select id, header_name FROM header where acc_id = ? order by id',
+      'select id, header_name FROM header where acc_id = ? order by id desc',
       [accId]
     );
 
@@ -853,19 +853,26 @@ app.get('/getAllremainderDate', authenticationToken, async (req, res) => {
 
     // Get all reminders with their associated item info
     const [reminders] = await req.db.query(
-      `select 
-        r.id, 
-        r.item_id, 
-        i.title AS item_title,
-        i.header_name,
-        r.reminder_name,
-        DATE_FORMAT(r.reminder_date, '%Y-%m-%d') AS reminder_date,
-        r.alert_before
-       FROM reminder_mas r
-       JOIN item_mas i ON r.item_id = i.id
-       WHERE r.acc_id = ?
-       ORDER BY r.reminder_date ASC
-       LIMIT 10`,
+      `SELECT 
+          r.id, 
+          r.item_id, 
+          i.title AS item_title,
+          i.header_name,
+          r.reminder_name,
+          DATE_FORMAT(r.reminder_date, '%Y-%m-%d') AS reminder_date,
+          rm.remind_me_name as alert_before
+        FROM reminder_mas r
+        LEFT JOIN item_mas i ON r.item_id = i.id
+        LEFT JOIN remind_me rm ON r.alert_before = rm.id
+        WHERE r.acc_id = 1
+          AND (
+            (r.alert_before = 1 AND CURRENT_DATE >= DATE_SUB(r.reminder_date, INTERVAL 1 DAY)) OR
+            (r.alert_before = 2 AND CURRENT_DATE >= DATE_SUB(r.reminder_date, INTERVAL 1 WEEK)) OR
+            (r.alert_before = 3 AND CURRENT_DATE >= DATE_SUB(r.reminder_date, INTERVAL 15 DAY)) OR
+            (r.alert_before = 4 AND CURRENT_DATE >= DATE_SUB(r.reminder_date, INTERVAL 1 MONTH))
+          )
+        ORDER BY r.reminder_date ASC
+        LIMIT 10`,
       [accId]
     );
 
@@ -883,7 +890,10 @@ app.get('/getAllDocumentData', authenticationToken, async (req, res) => {
 
     // Get all documents with their associated item info
     const [documents] = await req.db.query(
-      `select d.id, d.acc_id,d.item_id,d.doc_name,d.doc_file from doc_mas d where d.acc_id = ?`,
+      `select d.id, d.acc_id,d.item_id,d.doc_name,d.doc_file ,im.title
+      from doc_mas d 
+      left outer join item_mas as im on im.id = d.item_id
+      where d.acc_id = ? order by id limit 5`,
       [accId]
     );
     res.json(documents);
@@ -891,5 +901,34 @@ app.get('/getAllDocumentData', authenticationToken, async (req, res) => {
   } catch (error) {
     console.error('Error fetching all documents:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/remindMeName', async (req, res) => {
+  try {
+    const [rows] = await req.db.query(`select id , remind_me_name from remind_me
+      where status = 0`);
+      res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch headers' });
+  }
+});
+
+app.get('/searchDocuments', authenticationToken, async (req, res) => {
+  try {
+    const { term } = req.query;
+    const accId = req.userDetails.userId;
+
+    const [results] = await req.db.query(
+      `SELECT id, doc_name, doc_file 
+       FROM doc_mas 
+       WHERE acc_id = ? AND doc_name LIKE ?`,
+      [accId, `%${term}%`]
+    );
+
+    res.json(results || []);
+  } catch (error) {
+    console.error('Document search error:', error);
+    res.status(500).json([]);
   }
 });
