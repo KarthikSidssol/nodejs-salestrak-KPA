@@ -80,7 +80,7 @@ app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(cookieParser());
 
 app.use(cors({
-  origin: ['http://localhost:3000'],
+  origin: ['http://localhost:3000','http://pa.salestrak.in'],
   credentials: true
 }));
 
@@ -201,7 +201,7 @@ app.post('/login', async (req, res) => {
 
     // Create JWT token
     const token = jwt.sign(
-      { userId: user.id, email: user.email },
+      { userId: user.id, email: user.email, name: user.acc_name, ph_no: user.mobile },
       process.env.ACCESS_TOKEN
     );
 
@@ -275,7 +275,7 @@ app.get('/me', authenticationToken, (req, res) => {
 });
 
 function authenticationToken(req, res, next) {
-  const token = req.cookies['session-token']; // ✅ use correct name
+  const token = req.cookies['session-token']; 
   if (token == null) return res.sendStatus(401);
 
   jwt.verify(token, process.env.ACCESS_TOKEN, (err, userDetails) => {
@@ -403,7 +403,7 @@ app.post('/getItemByHeaderId', authenticationToken, async (req, res) => {
     }
 
     const [reminderRows] = await req.db.query(
-      `select id, item_id, reminder_name, DATE_FORMAT(reminder_date,'%Y-%m-%d') AS reminder_date, alert_before
+      `select id, item_id, reminder_name, DATE_FORMAT(reminder_date,'%d-%m-%Y') AS reminder_date, alert_before
        from reminder_mas
        where item_id = ? and acc_id = ?`,
       [itemId, accId]
@@ -815,7 +815,7 @@ app.get('/getAllItemData', authenticationToken, async (req, res) => {
     const accId = req.userDetails.userId;
 
     const [headers] = await req.db.query(
-      'select id, header_name FROM header where acc_id = ? order by id desc',
+      'select id, header_name FROM header where acc_id = ?',
       [accId]
     );
 
@@ -828,7 +828,7 @@ app.get('/getAllItemData', authenticationToken, async (req, res) => {
       `select id, header_id, header_name, title, short_desc 
        from item_mas 
        where acc_id = ? 
-       order by id`,
+       order by id desc`,
       [accId]
     );
 
@@ -857,22 +857,21 @@ app.get('/getAllremainderDate', authenticationToken, async (req, res) => {
           r.id, 
           r.item_id, 
           i.title AS item_title,
-          i.header_name,
+          i.header_name,i.header_id,
           r.reminder_name,
           DATE_FORMAT(r.reminder_date, '%Y-%m-%d') AS reminder_date,
           rm.remind_me_name as alert_before
         FROM reminder_mas r
         LEFT JOIN item_mas i ON r.item_id = i.id
         LEFT JOIN remind_me rm ON r.alert_before = rm.id
-        WHERE r.acc_id = 1
+        WHERE r.acc_id = ?
           AND (
             (r.alert_before = 1 AND CURRENT_DATE >= DATE_SUB(r.reminder_date, INTERVAL 1 DAY)) OR
             (r.alert_before = 2 AND CURRENT_DATE >= DATE_SUB(r.reminder_date, INTERVAL 1 WEEK)) OR
             (r.alert_before = 3 AND CURRENT_DATE >= DATE_SUB(r.reminder_date, INTERVAL 15 DAY)) OR
             (r.alert_before = 4 AND CURRENT_DATE >= DATE_SUB(r.reminder_date, INTERVAL 1 MONTH))
           )
-        ORDER BY r.reminder_date ASC
-        LIMIT 10`,
+        ORDER BY r.id ASC`,
       [accId]
     );
 
@@ -929,6 +928,25 @@ app.get('/searchDocuments', authenticationToken, async (req, res) => {
     res.json(results || []);
   } catch (error) {
     console.error('Document search error:', error);
+    res.status(500).json([]);
+  }
+});
+
+app.get('/searchItems', authenticationToken, async (req, res) => {
+  try {
+    const { term } = req.query;
+    const accId = req.userDetails.userId;
+
+    const [results] = await req.db.query(
+      `SELECT id, title, short_desc, header_id 
+       FROM item_mas 
+       WHERE acc_id = ? AND title LIKE ?`,
+      [accId, `%${term}%`]
+    );
+
+    res.json(results || []);
+  } catch (error) {
+    console.error('Item search error:', error);
     res.status(500).json([]);
   }
 });
